@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Clock – Symbol per Time</title>
+  <style>
+    :root { --bg:#0b1020; --fg:#e7ecff; --muted:#97a0c0; --btn:#2a57ff; --btnh:#1f45cc; }
+    body{
+      margin:0;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+      gap:10px;background:var(--bg);color:var(--fg);font-family:Arial,ui-sans-serif,system-ui
+    }
+    /* Nhỏ gọn hơn bản trước */
+    #symbol{
+      font-size: clamp(42px, 9vw, 88px);
+      line-height:1; font-weight:900; letter-spacing:2px;
+      transition: color .2s ease, opacity .2s ease;
+    }
+    #label{ font-size: clamp(13px, 2.6vw, 18px); color: var(--muted); }
+    .dim{ opacity:.35 }
+    .buttons{ display:flex; gap:10px; margin-top:8px }
+    button{
+      font-size:14px; padding:8px 14px; cursor:pointer; border:none; border-radius:8px;
+      background:var(--btn); color:#fff; font-weight:700
+    }
+    button:hover{ background:var(--btnh) }
+    .mode{ font-size:12px; color:var(--muted) }
+  </style>
+</head>
+<body>
+  <!-- Hiển thị chính: ký tự + nhãn giờ nhỏ bên dưới -->
+  <div id="symbol" class="dim">–</div>
+  <div id="label">--:--</div>
+
+  <div class="buttons">
+    <button id="manualBtn" title="Thủ công: nhập giờ:phút">T</button>
+    <button id="autoBtn" title="Tự động: chỉ hiển thị khi tới mốc, 2 phút/mốc">A</button>
+  </div>
+  <div class="mode" id="modeText">Chế độ: tự động (theo giờ thực)</div>
+
+  <script>
+    // 1) Danh sách mốc giờ
+    const SCHEDULES = ["02:00","04:00","06:00","08:30","10:00","12:00","14:00","16:00","18:30","20:00","22:00","23:45"];
+
+    // 2) Ký tự & màu cố định cho từng mốc (có thể thay theo ý bạn)
+    const STYLES = {
+      "02:00": { glyph:"★", color:"#ff6b6b" }, // đỏ san hô
+      "04:00": { glyph:"◆", color:"#845ef7" }, // tím
+      "06:00": { glyph:"●", color:"#22b8cf" }, // xanh ngọc
+      "08:30": { glyph:"▲", color:"#51cf66" }, // xanh lá
+      "10:00": { glyph:"■", color:"#fcc419" }, // vàng
+      "12:00": { glyph:"☀", color:"#fab005" }, // nắng trưa
+      "14:00": { glyph:"☕", color:"#c08457" }, // nâu
+      "16:00": { glyph:"⬢", color:"#00b894" }, // lục ngọc
+      "18:30": { glyph:"☾", color:"#74c0fc" }, // lam
+      "20:00": { glyph:"✦", color:"#ffd43b" }, // vàng nhạt
+      "22:00": { glyph:"✚", color:"#e599f7" }, // hồng tím
+      "23:45": { glyph:"✺", color:"#ff922b" }  // cam
+    };
+
+    const WINDOW_MS = 2 * 60 * 1000; // hiện 2 phút
+    const symbolEl = document.getElementById('symbol');
+    const labelEl  = document.getElementById('label');
+    const modeText = document.getElementById('modeText');
+
+    let mode = 'auto';      // 'auto' | 'manual'
+    let tickHandle = null;  // interval
+
+    function todayAt(hhmm){
+      const [h,m] = hhmm.split(':').map(n=>parseInt(n,10));
+      const d = new Date(); d.setHours(h,m,0,0); return d;
+    }
+    function activeSchedule(now){
+      // Nếu now nằm trong [mốc, mốc+2 phút) → trả về mốc
+      for(const t of SCHEDULES){
+        const start = todayAt(t);
+        const diff = now - start;
+        if(diff >= 0 && diff < WINDOW_MS) return t;
+      }
+      return null;
+    }
+
+    function renderAuto(){
+      const now = new Date();
+      const t = activeSchedule(now);
+      if(t){
+        const sty = STYLES[t] || { glyph:"■", color:"#ffffff" };
+        symbolEl.textContent = sty.glyph;
+        symbolEl.style.color = sty.color;
+        symbolEl.classList.remove('dim');
+        labelEl.textContent = t;
+      }else{
+        symbolEl.textContent = "–";
+        symbolEl.style.color = "inherit";
+        symbolEl.classList.add('dim');
+        labelEl.textContent = "--:--";
+      }
+    }
+
+    function startTick(){
+      stopTick();
+      const render = () => (mode === 'auto' ? renderAuto() : null);
+      render();
+      const align = 1000 - (Date.now() % 1000);
+      setTimeout(()=>{ render(); tickHandle = setInterval(render, 1000); }, align);
+    }
+    function stopTick(){ if(tickHandle){ clearInterval(tickHandle); tickHandle = null; } }
+
+    // Thủ công: hiển thị thời gian bạn nhập, dùng màu mặc định
+    function setManual(hh, mm){
+      mode = 'manual';
+      modeText.textContent = 'Chế độ: thủ công';
+      stopTick();
+      const h = String(Math.max(0,Math.min(23,parseInt(hh,10)||0))).padStart(2,'0');
+      const m = String(Math.max(0,Math.min(59,parseInt(mm,10)||0))).padStart(2,'0');
+      symbolEl.textContent = "✎";     // biểu tượng chế độ chỉnh tay
+      symbolEl.style.color = "inherit";
+      symbolEl.classList.remove('dim');
+      labelEl.textContent = `${h}:${m}`;
+    }
+    function setAuto(){
+      mode = 'auto';
+      modeText.textContent = 'Chế độ: tự động (theo giờ thực)';
+      renderAuto();
+      startTick();
+    }
+
+    // Nút
+    document.getElementById('manualBtn').addEventListener('click', ()=>{
+      const h = prompt('Nhập giờ (0-23):','00'); if(h===null) return;
+      const m = prompt('Nhập phút (0-59):','00'); if(m===null) return;
+      if(isNaN(h)||isNaN(m)) return alert('Vui lòng nhập số hợp lệ.');
+      setManual(h,m);
+    });
+    document.getElementById('autoBtn').addEventListener('click', setAuto);
+    window.addEventListener('keydown', e=>{
+      if(e.key.toLowerCase()==='t') document.getElementById('manualBtn').click();
+      if(e.key.toLowerCase()==='a') document.getElementById('autoBtn').click();
+    });
+
+    // Khởi động
+    setAuto();
+  </script>
+</body>
+</html>
