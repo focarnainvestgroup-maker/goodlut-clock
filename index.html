@@ -10,7 +10,7 @@
       margin:0;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;
       gap:10px;background:var(--bg);color:var(--fg);font-family:Arial,ui-sans-serif,system-ui
     }
-    /* Nhỏ gọn hơn bản trước */
+    /* Nhỏ gọn */
     #symbol{
       font-size: clamp(42px, 9vw, 88px);
       line-height:1; font-weight:900; letter-spacing:2px;
@@ -42,7 +42,7 @@
     // 1) Danh sách mốc giờ
     const SCHEDULES = ["02:00","04:00","06:00","08:30","10:00","12:00","14:00","16:00","18:30","20:00","22:00","23:45"];
 
-    // 2) Ký tự & màu cố định cho từng mốc (có thể thay theo ý bạn)
+    // 2) Ký tự & màu cố định cho từng mốc (tuỳ chỉnh theo ý bạn)
     const STYLES = {
       "02:00": { glyph:"★", color:"#ff6b6b" }, // đỏ san hô
       "04:00": { glyph:"◆", color:"#845ef7" }, // tím
@@ -59,6 +59,7 @@
     };
 
     const WINDOW_MS = 2 * 60 * 1000; // hiện 2 phút
+
     const symbolEl = document.getElementById('symbol');
     const labelEl  = document.getElementById('label');
     const modeText = document.getElementById('modeText');
@@ -66,6 +67,7 @@
     let mode = 'auto';      // 'auto' | 'manual'
     let tickHandle = null;  // interval
 
+    // Utilities
     function todayAt(hhmm){
       const [h,m] = hhmm.split(':').map(n=>parseInt(n,10));
       const d = new Date(); d.setHours(h,m,0,0); return d;
@@ -79,22 +81,26 @@
       }
       return null;
     }
-
-    function renderAuto(){
-      const now = new Date();
-      const t = activeSchedule(now);
-      if(t){
-        const sty = STYLES[t] || { glyph:"■", color:"#ffffff" };
+    function applyStyleFor(timeStr){
+      const sty = STYLES[timeStr];
+      if (sty){
         symbolEl.textContent = sty.glyph;
         symbolEl.style.color = sty.color;
         symbolEl.classList.remove('dim');
-        labelEl.textContent = t;
-      }else{
+      } else {
         symbolEl.textContent = "–";
-        symbolEl.style.color = "inherit";                                                        
+        symbolEl.style.color = "inherit";
         symbolEl.classList.add('dim');
-        labelEl.textContent = "--:--";
       }
+      labelEl.textContent = timeStr || "--:--";
+    }
+
+    // AUTO render
+    function renderAuto(){
+      const now = new Date();
+      const t = activeSchedule(now);
+      if(t) applyStyleFor(t);
+      else applyStyleFor(null);
     }
 
     function startTick(){
@@ -106,17 +112,24 @@
     }
     function stopTick(){ if(tickHandle){ clearInterval(tickHandle); tickHandle = null; } }
 
-    // Thủ công: hiển thị thời gian bạn nhập, dùng màu mặc định
+    // MANUAL: hiển thị theo giờ nhập; nếu trùng mốc → áp style tương ứng
     function setManual(hh, mm){
       mode = 'manual';
       modeText.textContent = 'Chế độ: thủ công';
       stopTick();
-      const h = String(Math.max(0,Math.min(23,parseInt(hh,10)||0))).padStart(2,'0');
-      const m = String(Math.max(0,Math.min(59,parseInt(mm,10)||0))).padStart(2,'0');
-      symbolEl.textContent = "✎";     // biểu tượng chế độ chỉnh tay
-      symbolEl.style.color = "inherit";
-      symbolEl.classList.remove('dim');
-      labelEl.textContent = `${h}:${m}`;
+
+      const h = String(Math.max(0, Math.min(23, Number(hh)||0))).padStart(2,'0');
+      const m = String(Math.max(0, Math.min(59, Number(mm)||0))).padStart(2,'0');
+      const timeStr = `${h}:${m}`;
+
+      if (SCHEDULES.includes(timeStr)) {
+        applyStyleFor(timeStr);
+      } else {
+        symbolEl.textContent = "✎";               // biểu tượng chế độ chỉnh tay
+        symbolEl.style.color = "inherit";
+        symbolEl.classList.remove('dim');
+        labelEl.textContent = timeStr;
+      }
     }
     function setAuto(){
       mode = 'auto';
@@ -125,7 +138,7 @@
       startTick();
     }
 
-    // Nút
+    // Events
     document.getElementById('manualBtn').addEventListener('click', ()=>{
       const h = prompt('Nhập giờ (0-23):','00'); if(h===null) return;
       const m = prompt('Nhập phút (0-59):','00'); if(m===null) return;
@@ -143,3 +156,4 @@
   </script>
 </body>
 </html>
+          
